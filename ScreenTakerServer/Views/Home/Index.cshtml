@@ -1,0 +1,122 @@
+﻿@{
+    ViewBag.Title = "Time Tracker Server Page";
+}
+
+<div class="row">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-5">
+                <h2>Screenshots and Hanging Around</h2>
+                <div class="container" id="screenshotInfo">
+
+                </div>
+            </div>
+            <div class="col-md-3">
+                <h2>MouseStatus</h2>
+                <div class="container" id="mouseStatus">
+
+                </div>
+            </div>
+            <div class="col-md-4">
+                <h2>Come In Messages</h2>
+                <div class="container" id="comingMsg">
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="~/Scripts/jquery-1.10.2.min.js"></script>
+<script>
+    $(document).ready(function () {
+        redrawWindow();
+        setInterval(redrawWindow, 10000);
+    });
+
+    function redrawWindow() {
+        $.ajax({
+            url: "Home/getFilesInEachDirectories",
+            success: function (response) {
+                var screenshotData = response.screenshotFilePaths;
+                var mouseStatusData = response.mouseStatusFilePaths;
+                var messageData = response.MessageFilePaths;
+                var screenshotStr = "";
+                for (var indexScreenshot = 0; indexScreenshot < screenshotData.length; indexScreenshot++) {
+                    screenshotStr += '<div class="row">';
+                    var imageFileName = screenshotData[indexScreenshot].split("\\")[screenshotData[indexScreenshot].split("\\").length - 1];
+                    screenshotStr += '<a href="../Upload/Screenshots/' + imageFileName + '" target="blank"><img class="screenshot_img" src="../Upload/Screenshots/' + imageFileName + '" /></a>';
+                    screenshotStr += '</div>';
+                    screenshotStr += '<hr/>';
+                }
+                $("#screenshotInfo").html(screenshotStr);
+                var promises = [];
+                for (var index = 0; index < mouseStatusData.length; index++) {
+                    promises.push(fileReadfunc(mouseStatusData[index]));
+                }
+                Promise.all(promises)
+                    .then(mouses => {
+                        var mouseStatusStr = "";
+                        for (var index = 0; index < mouses.length; index++) {
+                            for (var indexj = 0; indexj < mouses[index].length; indexj++) {
+                                if (mouses[index][indexj] != '') {
+                                    mouseStatusStr += '<div class="row">';
+                                    mouseStatusStr += '<h4>' + mouses[index][indexj] + '</h4>';
+                                    mouseStatusStr += '</div>';
+                                    mouseStatusStr += '<hr/>';
+                                }
+                            }
+                        }
+                        promises = [];
+                        for (var index = 0; index < messageData.length; index++) {
+                            promises.push(fileReadfunc(messageData[index]));
+                        }
+                        $("#mouseStatus").html(mouseStatusStr);
+                        return Promise.all(promises);
+                    })
+                    .then(messages => {
+                        var messageStr = "";
+                        for (var index = 0; index < messages.length; index++) {
+                            var tmpMessage = fileReadfunc(messageData[index]);
+                            for (var indexj = 0; indexj < messages[index].length; indexj++) {
+                                if (messages[index][indexj] != '') {
+                                    messageStr += '<div class="row">';
+                                    messageStr += '<h4>' + messages[index][indexj] + '</h4>';
+                                    messageStr += '</div>';
+                                    messageStr += '<hr/>';
+                                }
+                            }
+                        }
+                        $("#comingMsg").html(messageStr);
+                    })
+                    .catch(error => {
+                        console.log("Error");
+                    })
+            }
+        });
+    }
+
+    function fileReadfunc(fileName, callback) {
+
+        return new Promise((resolve, reject) => {
+            var rawFile = new XMLHttpRequest();
+            var realFilePath = "../Upload/" + fileName.split("\\")[fileName.split("\\").length - 2] + "/" + fileName.split("\\")[fileName.split("\\").length - 1];
+            rawFile.open("GET", realFilePath, false);
+            rawFile.onreadystatechange = function (err) {
+                if (rawFile.readyState === 4) {
+                    if (rawFile.status === 200 || rawFile.status == 0) {
+                        var allText = rawFile.responseText;
+                        var splitted = allText.split('\r\n');
+                        if (callback) {
+                            callback(splitted);
+                        }
+                        resolve(splitted);
+                        return;
+                    }
+                }
+                reject(err);
+            }
+            rawFile.send(null);
+        })
+    }
+
+</script>
